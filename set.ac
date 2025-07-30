@@ -14,17 +14,18 @@ define singleton_fun<K>(a: K, x: K) -> Bool {
     a = x
 }
 
-// XXX: broken
-// theorem neg_of_neg_is_self<K>(f: K -> Bool) {
-//     negate_fun(negate_fun(f)) = f
-// } by {
-//     let nf = negate_fun(f)
-//     forall(x: K) {
-//         nf(x) = not f(x)
-//         negate_fun(nf, x) = not nf(x)
-//         negate_fun(nf, x) = not (not f(x))
-//     }
-// }
+theorem neg_of_neg_is_self<K>(f: K -> Bool) {
+    negate_fun(negate_fun(f)) = f
+} by {
+    forall(x: K) {
+        // Trick that helps the prover, thanks @lacker
+        if f(x) {
+            negate_fun(negate_fun(f), x) = f(x)
+        } else {
+            negate_fun(negate_fun(f), x) = f(x)
+        }
+    }
+}
 
 // Set basics
 attributes Set<K> {
@@ -49,12 +50,20 @@ theorem empty_set_is_empty<K> {
     (Set<K>.empty_set).is_empty
 }
 
-// XXX: Needs `neg_of_neg_is_self` to be fixed
-// theorem compl_of_compl_is_self<K>(s: Set<K>) {
-//     s.c.c = s
-// } by {
-//     negate_fun(negate_fun(s.contains)) = s.contains
-// }
+theorem compl_of_compl_is_self<K>(s: Set<K>) {
+    s.c.c = s
+} by {
+    forall(x: K) {
+        if s.contains(x) {
+            s.c.c.contains(x)
+        } else {
+            not s.c.c.contains(x)
+        }
+        s.c.c.contains(x) = s.contains(x)
+    }
+
+    s.c.c.contains = s.contains
+}
 
 theorem empty_set_compl_is_universal<K> {
     (Set<K>.empty_set).c = Set<K>.universal_set
@@ -63,8 +72,8 @@ theorem empty_set_compl_is_universal<K> {
     let u = Set<K>.universal_set
 
     forall(x: K) {
-        e.c.contains(x) = true
-        u.contains(x) = true
+        e.c.contains(x)
+        u.contains(x)
     }
 
     e.c.contains = u.contains
@@ -77,8 +86,8 @@ theorem universal_set_compl_is_empty<K> {
     let u = Set<K>.universal_set
 
     forall(x: K) {
-        u.c.contains(x) = false
-        e.contains(x) = false
+        not u.c.contains(x)
+        not e.contains(x)
     }
 
     u.c.contains = e.contains
@@ -89,7 +98,7 @@ theorem singleton_set_is_not_empty<K>(a: K) {
 } by {
     let s = Set<K>.singleton(a)
 
-    s.contains(a) = true
+    s.contains(a)
 }
 
 // Subsets
@@ -129,6 +138,7 @@ theorem double_inclusion<K>(a: Set<K>, b: Set<K>) {
     }
     a.contains = b.contains
 }
+
 // "Standard" union and intersection of two sets
 define elem_in_union<K>(a: Set<K>, b: Set<K>, x: K) -> Bool {
     a.contains(x) or b.contains(x)
@@ -237,17 +247,87 @@ theorem intersection_comm<K>(a: Set<K>, b: Set<K>) {
     let u = a.intersection(b)
     let v = b.intersection(a)
 
-    v.superset(u)
+    forall(x: K) {
+        if u.contains(x) {
+            a.contains(x)
+            b.contains(x)
+
+            v.contains(x)
+        }
+    }
+    u.subset(v)
 
     forall(x: K) {
         if v.contains(x) {
-            a.contains(x) and b.contains(x)
+            a.contains(x)
+            b.contains(x)
+
             u.contains(x)
         }
     }
     u.superset(v)
 }
 
+theorem intersection_assoc<K>(a: Set<K>, b: Set<K>, c: Set<K>) {
+    a.intersection(b.intersection(c)) = a.intersection(b).intersection(c)
+} by {
+    let u = a.intersection(b.intersection(c))
+    let v = a.intersection(b).intersection(c)
+
+    // See union proof for comments
+    a.superset(u)
+    b.superset(b.intersection(c))
+    b.superset(u)
+    c.superset(b.intersection(c))
+    c.superset(u)
+    v.superset(u)
+
+    a.superset(a.intersection(b))
+    a.superset(v)
+    b.superset(a.intersection(b))
+    b.superset(v)
+    c.superset(v)
+    u.superset(v)
+}
+
+// Union + intersection theorems
+theorem union_intersection_distrib<K>(a: Set<K>, b: Set<K>, c: Set<K>) {
+    a.union(b.intersection(c)) = a.union(b).intersection(a.union(c))
+} by {
+    let u = a.union(b.intersection(c))
+    let v = a.union(b).intersection(a.union(c))
+
+    // Forward direction ("easy")
+    a.subset(a.union(b))
+    a.subset(a.union(c))
+    a.subset(v)
+
+    let bc = b.intersection(c)
+    bc.subset(a.union(b))
+    bc.subset(a.union(c))
+    v.superset(bc)
+    bc.subset(v)
+
+    u.subset(v)
+
+    // Other direction
+    forall(x: K) {
+        if v.contains(x) {
+            a.union(b).contains(x)
+            a.union(c).contains(x)
+
+            if a.contains(x) {
+                u.contains(x)
+            } else {
+                b.contains(x)
+                c.contains(x)
+                b.intersection(c).contains(x)
+                u.contains(x)
+            }
+        }
+    }
+    v.subset(u)
+}
 
 // Union and intersection over a family of sets
 define or_family<K, I> (f: I -> Set<K>, x: K) -> Bool {
@@ -279,10 +359,13 @@ inductive TwoType {
 
 // Creates a function f: TwoType -> Set<K>
 define fun_of_two<K>(a: Set<K>, b: Set<K>, x: TwoType) -> Set<K> {
-    if x = TwoType.first {
-        a
-    } else {
-        b
+    match x {
+        TwoType.first {
+            a
+        }
+        TwoType.second {
+            b
+        }
     }
 }
 
@@ -343,18 +426,54 @@ theorem union_is_family_union_of_two<K>(a: Set<K>, b: Set<K>) {
     v.subset(u)
 }
 
-// A type T is isomorphic to TwoType if there exists an invertible function f: T -> TwoType
-// XXX: Should probably break this out into injective/surjective/etc in separate functions-over-set file
-// but ok for now
-define two_isomorphic<T>(f: T -> TwoType) -> Bool {
-    exists(x: T) {
-        f(x) = TwoType.first
-    } and exists(y: T) {
-        f(y) = TwoType.second
-    } and forall(z: T, w: T) {
-        f(z) = f(w) implies z = w
+theorem intersection_is_family_intersection_of_two<K>(a: Set<K>, b: Set<K>) {
+    a.intersection(b) = intersection_family(fun_of_two(a, b))
+} by {
+    let u = a.intersection(b)
+    let v = intersection_family(fun_of_two(a, b))
+    let f_two = fun_of_two(a, b)
+
+    // First prove that u \subseteq v
+    forall(x: K) {
+        if u.contains(x) {
+            a.contains(x)
+            b.contains(x)
+
+            forall(t: TwoType) {
+                match t {
+                    TwoType.first {
+                        f_two(t).contains(x)
+                    }
+                    TwoType.second {
+                        f_two(t).contains(x)
+                    }
+                }
+            }
+
+            v.contains(x)
+        }
+
+        u.contains(x) implies v.contains(x)
     }
+    u.subset(v)
+
+    // Makes life a little easier for the prover
+    f_two(TwoType.first) = a
+    f_two(TwoType.second) = b
+
+    // Now prove that v \subseteq u
+    forall(x: K) {
+        if v.contains(x) {
+            // Definitions unrolled
+            intersection_family(f_two).contains(x)
+            f_two(TwoType.first).contains(x)
+            f_two(TwoType.second).contains(x)
+
+            u.contains(x)
+        }
+    }
+    v.subset(u)
 }
 
-// TODO: Prove the same for intersection
-
+// XXX: Prove that any type `T` with a bijection to `TwoType` will have union
+// and intersection also work and match the standard pairwise definitions
