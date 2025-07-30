@@ -7,155 +7,354 @@ structure Set<K> {
 define constant_false<K>(x: K) -> Bool {
     false
 }
-define constant_true<K>(x: K) -> Bool {
-    true
+define negate_fun<K>(f: K -> Bool, x: K) -> Bool {
+    not f(x)
+}
+define singleton_fun<K>(a: K, x: K) -> Bool {
+    a = x
 }
 
-let empty_set<K>: Set<K> = Set.new(constant_false<K>)
-let universal_set<K>: Set<K> = Set.new(constant_true<K>)
+// XXX: broken
+// theorem neg_of_neg_is_self<K>(f: K -> Bool) {
+//     negate_fun(negate_fun(f)) = f
+// } by {
+//     let nf = negate_fun(f)
+//     forall(x: K) {
+//         nf(x) = not f(x)
+//         negate_fun(nf, x) = not nf(x)
+//         negate_fun(nf, x) = not (not f(x))
+//     }
+// }
 
 // Set basics
-define is_empty<K>(s: Set<K>) -> Bool {
-    forall(x: K) {
-        not s.contains(x)
+attributes Set<K> {
+    let empty_set = Set<K>.new(constant_false<K>)
+    let universal_set = Set<K>.new(negate_fun(constant_false<K>))
+    let singleton: K -> Set<K> = function(a: K) {
+        Set<K>.new(singleton_fun(a))
+    }
+
+    define is_empty(self) -> Bool {
+        forall(x: K) {
+            not self.contains(x)
+        }
+    }
+
+    define c(self) -> Set<K> {
+        Set<K>.new(negate_fun(self.contains))
     }
 }
 
 theorem empty_set_is_empty<K> {
-    is_empty(empty_set<K>)
+    (Set<K>.empty_set).is_empty
 }
 
-// Subset
-define is_subset<K>(s1: Set<K>, s2: Set<K>) -> Bool {
+// XXX: Needs `neg_of_neg_is_self` to be fixed
+// theorem compl_of_compl_is_self<K>(s: Set<K>) {
+//     s.c.c = s
+// } by {
+//     negate_fun(negate_fun(s.contains)) = s.contains
+// }
+
+theorem empty_set_compl_is_universal<K> {
+    (Set<K>.empty_set).c = Set<K>.universal_set
+} by {
+    let e = Set<K>.empty_set
+    let u = Set<K>.universal_set
+
     forall(x: K) {
-        s1.contains(x) implies s2.contains(x)
+        e.c.contains(x) = true
+        u.contains(x) = true
     }
+
+    e.c.contains = u.contains
 }
 
-define is_supset<K>(s1: Set<K>, s2: Set<K>) -> Bool {
-    is_subset(s2, s1)
+theorem universal_set_compl_is_empty<K> {
+    (Set<K>.universal_set).c = Set<K>.empty_set
+} by {
+    let e = Set<K>.empty_set
+    let u = Set<K>.universal_set
+
+    forall(x: K) {
+        u.c.contains(x) = false
+        e.contains(x) = false
+    }
+
+    u.c.contains = e.contains
+}
+
+theorem singleton_set_is_not_empty<K>(a: K) {
+    (Set<K>.singleton(a)).is_empty = false
+} by {
+    let s = Set<K>.singleton(a)
+
+    s.contains(a) = true
+}
+
+// Subsets
+attributes Set<K> {
+    // self \subseteq s
+    define subset(self, s: Set<K>) -> Bool {
+        forall(x: K) {
+            self.contains(x) implies s.contains(x)
+        }
+    }
+
+    define superset(self, s: Set<K>) -> Bool {
+        s.subset(self)
+    }
 }
 
 // Subset theorems
 theorem empty_set_is_always_subset<K>(s: Set<K>) {
-    is_subset(empty_set<K>, s)
+    (Set<K>.empty_set).subset(s)
 }
 
 theorem subset_refl<K>(s: Set<K>) {
-    is_subset(s, s)
+    s.subset(s)
 }
 
-theorem subset_trans<K>(s1: Set<K>, s2: Set<K>, s3: Set<K>) {
-    is_subset(s1, s2) and is_subset(s2, s3) implies is_subset(s1, s3)
+theorem subset_trans<K>(a: Set<K>, b: Set<K>, c: Set<K>) {
+    a.subset(b) and b.subset(c) implies a.subset(c)
 }
 
-theorem double_inclusion<K>(s1: Set<K>, s2: Set<K>) {
-    is_subset(s1, s2) and is_subset(s2, s1) implies s1 = s2
+theorem double_inclusion<K>(a: Set<K>, b: Set<K>) {
+    a.subset(b) and b.subset(a) implies a = b
 } by {
     forall(x: K) {
-        s1.contains(x) implies s2.contains(x)
-        s2.contains(x) implies s1.contains(x)
-        s1.contains(x) = s2.contains(x)
+        a.contains(x) implies b.contains(x)
+        b.contains(x) implies a.contains(x)
+        a.contains(x) = b.contains(x)
     }
-    s1.contains = s2.contains
+    a.contains = b.contains
+}
+// "Standard" union and intersection of two sets
+define elem_in_union<K>(a: Set<K>, b: Set<K>, x: K) -> Bool {
+    a.contains(x) or b.contains(x)
 }
 
-// Union and intersection
-define elem_in_union<K>(s1: Set<K>, s2: Set<K>, x: K) -> Bool {
-    s1.contains(x) or s2.contains(x)
-}
-
-define union<K>(s1: Set<K>, s2:Set<K>) -> Set<K> {
-    Set<K>.new(elem_in_union(s1, s2))
-}
-
-define elem_in_intersection<K>(s1: Set<K>, s2: Set<K>, x: K) -> Bool {
-    s1.contains(x) and s2.contains(x)
-}
-
-define intersection<K>(s1: Set<K>, s2:Set<K>) -> Set<K> {
-    Set<K>.new(elem_in_intersection(s1, s2))
+define elem_in_intersection<K>(a: Set<K>, b: Set<K>, x: K) -> Bool {
+    a.contains(x) and b.contains(x)
 }
 
 // Difference
-define elem_in_difference<K>(s1: Set<K>, s2: Set<K>, x: K) -> Bool {
-    s1.contains(x) and not s2.contains(x)
+define elem_in_difference<K>(a: Set<K>, b: Set<K>, x: K) -> Bool {
+    a.contains(x) and not b.contains(x)
 }
 
-define set_difference<K>(s1: Set<K>, s2:Set<K>) -> Set<K> {
-    Set<K>.new(elem_in_difference(s1, s2))
+attributes Set<K> {
+    // self \cup s
+    define union(self, s: Set<K>) -> Set<K> {
+        Set.new(elem_in_union(self, s))
+    }
+
+    // self \cap s
+    define intersection(self, s: Set<K>) -> Set<K> {
+        Set<K>.new(elem_in_intersection(self, s))
+    }
+
+    // self \setminus s
+    define difference(self, s: Set<K>) -> Set<K> {
+        Set<K>.new(elem_in_difference(self, s))
+    }
 }
 
 // Union theorems
 // A \subseteq A \cup B (and same with B)
-theorem sets_subset_union<K>(s1: Set<K>, s2: Set<K>) {
-    is_subset(s1, union(s1, s2)) and is_subset(s2, union(s1, s2))
+theorem sets_subset_union<K>(a: Set<K>, b: Set<K>) {
+    a.subset(a.union(b)) and b.subset(a.union(b))
 } by {
-    is_subset(s1, union(s1, s2))
-    is_subset(s2, union(s1, s2))
+    a.subset(a.union(b))
+    b.subset(a.union(b))
 }
 
 // A \subseteq C and B \subseteq C implies A \cup B \subseteq C
 theorem sets_subset_contain_union<K>(a: Set<K>, b: Set<K>, c: Set<K>) {
-    is_subset(a, c) and is_subset(b, c) implies is_subset(union(a, b), c)
+    a.subset(c) and b.subset(c) implies a.union(b).subset(c)
 }
 
-theorem union_comm<K>(s1: Set<K>, s2: Set<K>) {
-    union(s1, s2) = union(s2, s1)
+theorem union_comm<K>(a: Set<K>, b: Set<K>) {
+    a.union(b) = b.union(a)
 } by {
-    let u = union(s1, s2)
-    let v = union(s2, s1)
+    let u = a.union(b)
+    let v = b.union(a)
 
-    is_subset(v, u)
-    is_subset(u, v)
+    v.subset(u)
+    u.subset(v)
 }
 
 theorem union_assoc<K>(a: Set<K>, b: Set<K>, c: Set<K>) {
-    union(a, union(b, c)) = union(union(a, b), c)
+    a.union(b.union(c)) = a.union(b).union(c)
 } by {
-    let u = union(a, union(b, c))
-    let v = union(union(a, b), c)
+    let u = a.union(b.union(c))
+    let v = a.union(b).union(c)
 
     // Note that A, B, C are subsets of U hence V is a subset of U
-    is_subset(a, u)
-    is_subset(b, u)
-    is_subset(c, u)
-    is_subset(v, u)
+    a.subset(u)
+    b.subset(u)
+    c.subset(u)
+    v.subset(u)
 
     // Reverse
-    is_subset(a, v)
-    is_subset(b, v)
-    is_subset(c, v)
-    is_subset(u, v)
+    a.subset(v)
+    b.subset(v)
+    c.subset(v)
+    u.subset(v)
 }
 
 theorem union_idemp<K>(s: Set<K>) {
-    union(s, s) = s
+    s.union(s) = s
 }
 
-theorem union_universal_is_universal<K>(s: Set<K>) {
-    union(s, universal_set<K>) = universal_set<K>
+theorem union_subset_is_set<K>(a: Set<K>, b: Set<K>) {
+    a.subset(b) implies a.union(b) = b
+}
+
+theorem all_sets_subset_universal<K>(s: Set<K>) {
+    s.subset(Set<K>.universal_set)
+}
+
+theorem union_with_universal_is_universal<K>(s: Set<K>) {
+    s.union(Set<K>.universal_set) = Set<K>.universal_set
 }
 
 // Intersection theorems
-theorem sets_subset_intersection<K>(s1: Set<K>, s2: Set<K>) {
-    is_subset(intersection(s1, s2), s1) and is_subset(intersection(s1, s2), s2)
+theorem sets_subset_intersection<K>(a: Set<K>, b: Set<K>) {
+    a.intersection(b).subset(a) and a.intersection(b).subset(b)
 } by {
-    is_subset(intersection(s1, s2), s1)
-    is_subset(intersection(s1, s2), s2)
+    a.intersection(b).subset(a)
+    a.intersection(b).subset(b)
 }
 
 theorem set_supset_contains_intersection<K>(a: Set<K>, b: Set<K>, c: Set<K>) {
-    is_supset(a, c) and is_supset(b, c) implies is_supset(intersection(a, b), c)
+    a.superset(c) and b.superset(c) implies a.intersection(b).superset(c)
 }
 
-theorem intersection_comm<K>(s1: Set<K>, s2: Set<K>) {
-    intersection(s1, s2) = intersection(s2, s1)
+theorem intersection_comm<K>(a: Set<K>, b: Set<K>) {
+    a.intersection(b) = b.intersection(a)
 } by {
-    let u = intersection(s1, s2)
-    let v = intersection(s2, s1)
+    let u = a.intersection(b)
+    let v = b.intersection(a)
 
-    is_supset(v, u)
-    is_supset(u, v)
+    v.superset(u)
+
+    forall(x: K) {
+        if v.contains(x) {
+            a.contains(x) and b.contains(x)
+            u.contains(x)
+        }
+    }
+    u.superset(v)
 }
+
+
+// Union and intersection over a family of sets
+define or_family<K, I> (f: I -> Set<K>, x: K) -> Bool {
+    exists(i: I) {
+        f(i).contains(x)
+    }
+}
+
+define and_family<K, I> (f: I -> Set<K>, x: K) -> Bool {
+    forall(i: I) {
+        f(i).contains(x)
+    }
+}
+
+define union_family<K, I>(f: I -> Set<K>) -> Set<K> {
+    Set<K>.new(or_family(f))
+}
+
+define intersection_family<K, I>(f: I -> Set<K>) -> Set<K> {
+    Set<K>.new(and_family(f))
+}
+
+// Proving indexed union and intersection definitions are consistent
+// with family definitions
+inductive TwoType {
+    first
+    second
+}
+
+// Creates a function f: TwoType -> Set<K>
+define fun_of_two<K>(a: Set<K>, b: Set<K>, x: TwoType) -> Set<K> {
+    if x = TwoType.first {
+        a
+    } else {
+        b
+    }
+}
+
+// Defines union in the case of two sets using family definition
+define family_union_of_two<K>(a: Set<K>, b: Set<K>) -> Set<K> {
+    union_family(fun_of_two(a, b))
+}
+
+theorem union_is_family_union_of_two<K>(a: Set<K>, b: Set<K>) {
+    a.union(b) = family_union_of_two(a, b)
+} by {
+    let u = a.union(b)
+    let v = family_union_of_two(a, b)
+    let f_two = fun_of_two(a, b)
+    // v_simp unrolls definitions, which helps the prover
+    let v_simp = union_family(f_two)
+
+    v = v_simp
+
+    // Helps with definitions
+    f_two(TwoType.first) = a
+    f_two(TwoType.second) = b
+
+    // First prove that u \subseteq v
+    forall(x: K) {
+        // Somehow this helps the prover though it only really unrolls definitions
+        u.contains(x) implies a.union(b).contains(x)
+        u.contains(x) implies (a.contains(x) or b.contains(x))
+        a.contains(x) implies v_simp.contains(x)
+        b.contains(x) implies v_simp.contains(x)
+
+        u.contains(x) implies v.contains(x)
+    }
+    u.subset(v)
+
+    // Now prove that v \subseteq u
+    forall(x: K) {
+        if v.contains(x) {
+            // Definition of v.contains(x), unrolled
+            v_simp.contains(x)
+
+            let (t: TwoType) satisfy {
+                f_two(t).contains(x)
+            }
+
+            match t {
+                TwoType.first {
+                    a.contains(x)
+                }
+                TwoType.second {
+                    b.contains(x)
+                }
+            }
+
+            u.contains(x)
+        }
+    }
+    v.subset(u)
+}
+
+// A type T is isomorphic to TwoType if there exists an invertible function f: T -> TwoType
+// XXX: Should probably break this out into injective/surjective/etc in separate functions-over-set file
+// but ok for now
+define two_isomorphic<T>(f: T -> TwoType) -> Bool {
+    exists(x: T) {
+        f(x) = TwoType.first
+    } and exists(y: T) {
+        f(y) = TwoType.second
+    } and forall(z: T, w: T) {
+        f(z) = f(w) implies z = w
+    }
+}
+
+// TODO: Prove the same for intersection
 
