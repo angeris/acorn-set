@@ -1,0 +1,161 @@
+/// Sets with elements of type `K` are defined as Boolean functions over `K`
+structure Set<K> {
+    contains: K -> Bool
+}
+
+// Obvious sets
+define constant_false<K>(x: K) -> Bool {
+    false
+}
+define constant_true<K>(x: K) -> Bool {
+    true
+}
+
+let empty_set<K>: Set<K> = Set.new(constant_false<K>)
+let universal_set<K>: Set<K> = Set.new(constant_true<K>)
+
+// Set basics
+define is_empty<K>(s: Set<K>) -> Bool {
+    forall(x: K) {
+        not s.contains(x)
+    }
+}
+
+theorem empty_set_is_empty<K> {
+    is_empty(empty_set<K>)
+}
+
+// Subset
+define is_subset<K>(s1: Set<K>, s2: Set<K>) -> Bool {
+    forall(x: K) {
+        s1.contains(x) implies s2.contains(x)
+    }
+}
+
+define is_supset<K>(s1: Set<K>, s2: Set<K>) -> Bool {
+    is_subset(s2, s1)
+}
+
+// Subset theorems
+theorem empty_set_is_always_subset<K>(s: Set<K>) {
+    is_subset(empty_set<K>, s)
+}
+
+theorem subset_refl<K>(s: Set<K>) {
+    is_subset(s, s)
+}
+
+theorem subset_trans<K>(s1: Set<K>, s2: Set<K>, s3: Set<K>) {
+    is_subset(s1, s2) and is_subset(s2, s3) implies is_subset(s1, s3)
+}
+
+theorem double_inclusion<K>(s1: Set<K>, s2: Set<K>) {
+    is_subset(s1, s2) and is_subset(s2, s1) implies s1 = s2
+} by {
+    forall(x: K) {
+        s1.contains(x) implies s2.contains(x)
+        s2.contains(x) implies s1.contains(x)
+        s1.contains(x) = s2.contains(x)
+    }
+    s1.contains = s2.contains
+}
+
+// Union and intersection
+define elem_in_union<K>(s1: Set<K>, s2: Set<K>, x: K) -> Bool {
+    s1.contains(x) or s2.contains(x)
+}
+
+define union<K>(s1: Set<K>, s2:Set<K>) -> Set<K> {
+    Set<K>.new(elem_in_union(s1, s2))
+}
+
+define elem_in_intersection<K>(s1: Set<K>, s2: Set<K>, x: K) -> Bool {
+    s1.contains(x) and s2.contains(x)
+}
+
+define intersection<K>(s1: Set<K>, s2:Set<K>) -> Set<K> {
+    Set<K>.new(elem_in_intersection(s1, s2))
+}
+
+// Difference
+define elem_in_difference<K>(s1: Set<K>, s2: Set<K>, x: K) -> Bool {
+    s1.contains(x) and not s2.contains(x)
+}
+
+define set_difference<K>(s1: Set<K>, s2:Set<K>) -> Set<K> {
+    Set<K>.new(elem_in_difference(s1, s2))
+}
+
+// Union theorems
+// A \subseteq A \cup B (and same with B)
+theorem sets_subset_union<K>(s1: Set<K>, s2: Set<K>) {
+    is_subset(s1, union(s1, s2)) and is_subset(s2, union(s1, s2))
+} by {
+    is_subset(s1, union(s1, s2))
+    is_subset(s2, union(s1, s2))
+}
+
+// A \subseteq C and B \subseteq C implies A \cup B \subseteq C
+theorem sets_subset_contain_union<K>(a: Set<K>, b: Set<K>, c: Set<K>) {
+    is_subset(a, c) and is_subset(b, c) implies is_subset(union(a, b), c)
+}
+
+theorem union_comm<K>(s1: Set<K>, s2: Set<K>) {
+    union(s1, s2) = union(s2, s1)
+} by {
+    let u = union(s1, s2)
+    let v = union(s2, s1)
+
+    is_subset(v, u)
+    is_subset(u, v)
+}
+
+theorem union_assoc<K>(a: Set<K>, b: Set<K>, c: Set<K>) {
+    union(a, union(b, c)) = union(union(a, b), c)
+} by {
+    let u = union(a, union(b, c))
+    let v = union(union(a, b), c)
+
+    // Note that A, B, C are subsets of U hence V is a subset of U
+    is_subset(a, u)
+    is_subset(b, u)
+    is_subset(c, u)
+    is_subset(v, u)
+
+    // Reverse
+    is_subset(a, v)
+    is_subset(b, v)
+    is_subset(c, v)
+    is_subset(u, v)
+}
+
+theorem union_idemp<K>(s: Set<K>) {
+    union(s, s) = s
+}
+
+theorem union_universal_is_universal<K>(s: Set<K>) {
+    union(s, universal_set<K>) = universal_set<K>
+}
+
+// Intersection theorems
+theorem sets_subset_intersection<K>(s1: Set<K>, s2: Set<K>) {
+    is_subset(intersection(s1, s2), s1) and is_subset(intersection(s1, s2), s2)
+} by {
+    is_subset(intersection(s1, s2), s1)
+    is_subset(intersection(s1, s2), s2)
+}
+
+theorem set_supset_contains_intersection<K>(a: Set<K>, b: Set<K>, c: Set<K>) {
+    is_supset(a, c) and is_supset(b, c) implies is_supset(intersection(a, b), c)
+}
+
+theorem intersection_comm<K>(s1: Set<K>, s2: Set<K>) {
+    intersection(s1, s2) = intersection(s2, s1)
+} by {
+    let u = intersection(s1, s2)
+    let v = intersection(s2, s1)
+
+    is_supset(v, u)
+    is_supset(u, v)
+}
+
