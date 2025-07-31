@@ -104,7 +104,7 @@ theorem universal_set_compl_is_empty<K> {
 }
 
 theorem singleton_set_is_not_empty<K>(a: K) {
-    (Set<K>.singleton(a)).is_empty = false
+    not (Set<K>.singleton(a)).is_empty
 } by {
     let s = Set<K>.singleton(a)
 
@@ -487,23 +487,24 @@ theorem intersection_is_family_intersection_of_two<K>(a: Set<K>, b: Set<K>) {
 
 // XXX: Prove that any type `T` with a bijection to `TwoType` will have union
 // and intersection also work and match the standard pairwise definitions
+// Likely better placed after defining image under sets, etc.
 
 // Function stuff, broken due to some CNF problems
-// define image<K, V>(f: K -> V) -> Set<V> {
-//     Set<V>.new(function(x: V) {
-//         exists(k: K) {
-//             f(k) = x
-//         }
-//     })
-// }
+define image<K, V>(f: K -> V) -> Set<V> {
+    Set<V>.new(function(x: V) {
+        exists(k: K) {
+            f(k) = x
+        }
+    })
+}
 
-// define image_over_set<K, V>(f: K -> V, s: Set<K>) -> Set<V> {
-//     Set<V>.new(function(x: V) {
-//         exists(k: K) {
-//             s.contains(k) and f(k) = x
-//         }
-//     })
-// }
+define image_over_set<K, V>(f: K -> V, s: Set<K>) -> Set<V> {
+    Set<V>.new(function(x: V) {
+        exists(k: K) {
+            s.contains(k) and f(k) = x
+        }
+    })
+}
 
 // define is_constant_function<K, V>(f: K -> V) -> Bool {
 //     exists(x: K) {
@@ -534,7 +535,7 @@ define bounded_by_n<K>(s: Set<K>, n: Nat, f: K -> Nat) -> Bool {
 }
 
 // Injective over restriction
-define injective_restricted<K>(s: Set<K>, f: K -> Nat) -> Bool {
+define injective_restricted<K, V>(s: Set<K>, f: K -> V) -> Bool {
     forall(x: K, y: K) {
         if (s.contains(x) and s.contains(y)) {
             f(x) = f(y) implies x = y
@@ -574,9 +575,6 @@ define injective_from_range<K>(s: Set<K>, n: Nat, f: Nat -> K) -> Bool {
         }
     }
 }
-
-// A set's cardinality is bounded below by `n >= 1` if there exists an injective function
-// from the range 0..n-1 to the set
 
 theorem empty_set_has_card_0<K> {
     Set<K>.empty_set.cardinality_bounded_above(Nat.0)
@@ -656,5 +654,18 @@ theorem cardinality_at_most_one_is_singleton_or_empty<K>(s: Set<K>) {
 
         s.contains = singleton_a.contains
         s.is_singleton
+    }
+}
+
+theorem cardinality_bounded_above_if_injection_exists<A, B>(a: Set<A>, b: Set<B>, n: Nat, f: A -> B) {
+    (
+        b.cardinality_bounded_above(n)
+        and injective_restricted(a, f)
+        and image_over_set(f, a).subset(b)
+    ) implies a.cardinality_bounded_above(n)
+} by {
+    b.cardinality_bounded_above(n)
+    let (g: B -> Nat) satisfy {
+        bounded_by_n(b, n, g) and injective_restricted(b, g)
     }
 }
