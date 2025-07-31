@@ -643,13 +643,12 @@ theorem cardinality_at_most_one_is_singleton_or_empty<K>(s: Set<K>) {
             if x != a {
                 not s.contains(x)
                 not singleton_a.contains(x)
-                s.contains(x) = singleton_a.contains(x)
             } if x = a {
-                x = a
                 s.contains(x)
-                s.contains(x) = singleton_a.contains(x)
+                singleton_a.contains(x)
             }
 
+            // Struggles with this one?
             s.contains(x) implies singleton_a.contains(x)
             singleton_a.contains(x) implies s.contains(x)
             singleton_a.contains(x) = s.contains(x)
