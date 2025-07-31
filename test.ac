@@ -1,0 +1,19 @@
+define is_constant_function<K, V>(f: K -> V) -> Bool {
+    exists(x: K) {
+        forall(y: K) {
+            f(x) = f(y)
+        }
+    }
+}
+
+theorem constant_function_has_singleton_image<K, V>(f: K -> V) {
+    is_constant_function(f)
+} by {
+    let (x: K) satisfy {
+        forall(y: K) {
+            f(x) = f(y)
+        }
+    }
+
+
+}

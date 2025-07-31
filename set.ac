@@ -44,10 +44,20 @@ attributes Set<K> {
     define c(self) -> Set<K> {
         Set<K>.new(negate_fun(self.contains))
     }
+
+    define is_singleton(self) -> Bool {
+        exists(a: K) {
+            self = Set<K>.singleton(a)
+        }
+    }
 }
 
 theorem empty_set_is_empty<K> {
     (Set<K>.empty_set).is_empty
+}
+
+theorem singleton_set_is_singleton<K>(a: K) {
+    (Set<K>.singleton(a)).is_singleton
 }
 
 theorem compl_of_compl_is_self<K>(s: Set<K>) {
@@ -477,3 +487,175 @@ theorem intersection_is_family_intersection_of_two<K>(a: Set<K>, b: Set<K>) {
 
 // XXX: Prove that any type `T` with a bijection to `TwoType` will have union
 // and intersection also work and match the standard pairwise definitions
+
+// Function stuff, broken due to some CNF problems
+// define image<K, V>(f: K -> V) -> Set<V> {
+//     Set<V>.new(function(x: V) {
+//         exists(k: K) {
+//             f(k) = x
+//         }
+//     })
+// }
+
+// define image_over_set<K, V>(f: K -> V, s: Set<K>) -> Set<V> {
+//     Set<V>.new(function(x: V) {
+//         exists(k: K) {
+//             s.contains(k) and f(k) = x
+//         }
+//     })
+// }
+
+// define is_constant_function<K, V>(f: K -> V) -> Bool {
+//     exists(x: K) {
+//         forall(y: K) {
+//             f(x) = f(y)
+//         }
+//     }
+// }
+
+// theorem constant_function_has_singleton_image<K, V>(f: K -> V) {
+//     is_constant_function(f) implies image(f).is_singleton
+// } by {
+//     let (x: K) satisfy {
+//         forall(y: K) {
+//             f(x) = f(y)
+//         }
+//     }
+// }
+
+// Cardinality stuff (unfortunately, this is slightly complicated here without dependent types)
+from nat import Nat
+
+// Bounded for elements in the set
+define bounded_by_n<K>(s: Set<K>, n: Nat, f: K -> Nat) -> Bool {
+    forall(x: K) {
+        s.contains(x) implies f(x) < n
+    }
+}
+
+// Injective over restriction
+define injective_restricted<K>(s: Set<K>, f: K -> Nat) -> Bool {
+    forall(x: K, y: K) {
+        if (s.contains(x) and s.contains(y)) {
+            f(x) = f(y) implies x = y
+        }
+    }
+}
+
+attributes Set<K> {
+    // A set's cardinality is bounded above by `n` if there exists an injective function
+    // from the set to the range 0..n-1 (values outside of the set can be any Nat)
+    define cardinality_bounded_above(self, n: Nat) -> Bool {
+        exists(f: K -> Nat) {
+            bounded_by_n(self, n, f) and injective_restricted(self, f)
+        }
+    }
+
+    // A set is finite if its cardinality is bounded above by some natural number
+    define is_finite(self) -> Bool {
+        exists(n: Nat) {
+            self.cardinality_bounded_above(n)
+        }
+    }
+}
+
+define contained_in_range<K>(s: Set<K>, n: Nat, f: Nat -> K) -> Bool {
+    // This is a helper function to prove that the function is injective
+    forall(x: Nat) {
+        x < n implies s.contains(f(x))
+    }
+}
+
+define injective_from_range<K>(s: Set<K>, n: Nat, f: Nat -> K) -> Bool {
+    // This is a helper function to prove that the function is injective
+    forall(x: Nat, y: Nat) {
+        if (x < n and y < n) {
+            f(x) = f(y) implies x = y
+        }
+    }
+}
+
+// A set's cardinality is bounded below by `n >= 1` if there exists an injective function
+// from the range 0..n-1 to the set
+
+theorem empty_set_has_card_0<K> {
+    Set<K>.empty_set.cardinality_bounded_above(Nat.0)
+} by {
+    let e = Set<K>.empty_set
+
+    e.cardinality_bounded_above(Nat.0)
+}
+
+theorem empty_set_is_finite<K> {
+    Set<K>.empty_set.is_finite
+}
+
+theorem singleton_set_has_cardinality_at_most_1<K>(a: K) {
+    Set<K>.singleton(a).cardinality_bounded_above(Nat.1)
+} by {
+    let s = Set<K>.singleton(a)
+
+    // Obvious function mapping everything to 0
+    let f = function(x: K) {
+        Nat.0
+    }
+
+    bounded_by_n(s, Nat.1, f)
+
+    // Prove injective
+    forall(x: K, y: K) {
+        if (s.contains(x) and s.contains(y)) {
+            // Can only be true when x = y
+            x = a
+            y = a
+            f(x) = f(y) implies x = y
+        }
+    }
+}
+
+theorem singleton_set_is_finite<K>(s: Set<K>) {
+    s.is_singleton implies s.is_finite
+}
+
+theorem cardinality_at_most_one_is_singleton_or_empty<K>(s: Set<K>) {
+    s.cardinality_bounded_above(Nat.1) implies s.is_singleton or s.is_empty
+} by {
+    if s.is_empty {
+        true
+    } else {
+        let (f: K -> Nat) satisfy {
+            bounded_by_n(s, Nat.1, f) and injective_restricted(s, f)
+        }
+
+        let (a: K) satisfy {
+            f(a) = Nat.0 and s.contains(a)
+        }
+
+        forall(x: K) {
+            if s.contains(x) {
+                f(x) = Nat.0 implies x = a
+            }
+        }
+
+        let singleton_a = Set<K>.singleton(a)
+
+        forall(x: K) {
+            if x != a {
+                not s.contains(x)
+                not singleton_a.contains(x)
+                s.contains(x) = singleton_a.contains(x)
+            } if x = a {
+                x = a
+                s.contains(x)
+                s.contains(x) = singleton_a.contains(x)
+            }
+
+            s.contains(x) implies singleton_a.contains(x)
+            singleton_a.contains(x) implies s.contains(x)
+            singleton_a.contains(x) = s.contains(x)
+        }
+
+        s.contains = singleton_a.contains
+        s.is_singleton
+    }
+}
