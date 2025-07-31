@@ -590,7 +590,7 @@ theorem empty_set_is_finite<K> {
     Set<K>.empty_set.is_finite
 }
 
-theorem singleton_set_has_cardinality_at_most_1<K>(a: K) {
+theorem singleton_set_has_cardinality_at_most_one<K>(a: K) {
     Set<K>.singleton(a).cardinality_bounded_above(Nat.1)
 } by {
     let s = Set<K>.singleton(a)
